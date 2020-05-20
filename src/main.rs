@@ -30,6 +30,9 @@ struct CliArgs {
     /// Path to target directory to clean
     #[structopt(long = "target-dir", value_name = "DIR", parse(from_os_str))]
     target_dir: Option<PathBuf>,
+    #[structopt(long = "dry-run")]
+    /// Do not actually remove files or directories.
+    dry_run: bool,
 
     /// Increase verbosity
     #[structopt(long = "verbose", short = "v", parse(from_occurrences))]
@@ -73,27 +76,34 @@ fn main() -> Result<()> {
     };
     let ws = Workspace::new(&root_manifest_path, &config)?;
 
-    let bytes = gc_workspace(&ws)?;
+    let bytes = gc_workspace(&ws, args.dry_run)?;
     let bytes_human = bytesize::ByteSize(bytes).to_string_as(true);
-    config
-        .shell()
-        .status("Finished", format_args!("{} freed", bytes_human))?;
+    if args.dry_run {
+        config.shell().status(
+            "Finished",
+            format_args!("{} can be freed (dry-run)", bytes_human),
+        )?;
+    } else {
+        config
+            .shell()
+            .status("Finished", format_args!("{} freed", bytes_human))?;
+    }
 
     Ok(())
 }
 
-fn gc_workspace(ws: &Workspace) -> CargoResult<u64> {
+fn gc_workspace(ws: &Workspace, dry_run: bool) -> CargoResult<u64> {
     let target_dir = ws.target_dir().into_path_unlocked();
     let mut collected_bytes = 0u64;
 
     let mut check = |target: &Option<String>, dir: &Path| -> CargoResult<()> {
         let p = dir.join("debug");
         if p.is_dir() {
-            collected_bytes += gc_artifects(ws, target, "dev", &p)?;
+            collected_bytes += gc_artifects(ws, target, "dev", "debug", &p, dry_run)?;
         }
         let p = dir.join("release");
         if p.is_dir() {
-            collected_bytes += gc_artifects(ws, target, "release", &p)?;
+            collected_bytes += gc_artifects(ws, target, "release", "release", &p, dry_run)?;
         }
         Ok(())
     };
@@ -116,14 +126,16 @@ fn gc_artifects(
     ws: &Workspace,
     target: &Option<String>,
     profile: &str,
+    display_profile: &str,
     dir: &Path,
+    dry_run: bool,
 ) -> CargoResult<u64> {
     match target {
         Some(target) => ws
             .config()
             .shell()
-            .status("Collecting", format_args!("{}/{}", target, profile))?,
-        None => ws.config().shell().status("Collecting", profile)?,
+            .status("Collecting", format_args!("{}/{}", target, display_profile))?,
+        None => ws.config().shell().status("Collecting", display_profile)?,
     }
 
     let mut reachable = collect::Reachable::default();
@@ -131,10 +143,14 @@ fn gc_artifects(
 
     let mut collected_bytes = 0u64;
     let mut remove = |path: &Path| -> Result<()> {
-        ws.config()
-            .shell()
-            .verbose(|s| s.status("Removing", path.display()))?;
-        collected_bytes += remove_recursive(&path)?;
+        ws.config().shell().verbose(|s| {
+            if dry_run {
+                s.status("Removing", format_args!("(skipped) {}", path.display()))
+            } else {
+                s.status("Removing", path.display())
+            }
+        })?;
+        collected_bytes += remove_recursive(&path, dry_run)?;
         Ok(())
     };
 
@@ -187,16 +203,20 @@ fn gc_artifects(
     Ok(collected_bytes)
 }
 
-fn remove_recursive(path: &Path) -> Result<u64> {
+fn remove_recursive(path: &Path, dry_run: bool) -> Result<u64> {
     let meta = path.symlink_metadata()?;
     let mut ret = meta.len();
     if meta.is_dir() {
         for entry in fs::read_dir(path)? {
-            ret += remove_recursive(&entry?.path())?;
+            ret += remove_recursive(&entry?.path(), dry_run)?;
         }
-        fs::remove_dir(path)?;
+        if !dry_run {
+            fs::remove_dir(path)?;
+        }
     } else {
-        fs::remove_file(path)?;
+        if !dry_run {
+            fs::remove_file(path)?;
+        }
     }
     Ok(ret)
 }
