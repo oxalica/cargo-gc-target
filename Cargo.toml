@@ -7,3 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.31"
+bytesize = "1.0.0"
+cargo = { git = "https://github.com/oxalica/cargo.git", rev = "9e4f7dc320ebf825c79aa14d13bcea2f1c226757" }
