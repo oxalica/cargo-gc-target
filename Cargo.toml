@@ -3,6 +3,9 @@ name = "cargo-gc-target"
 version = "0.1.0"
 authors = ["oxalica <oxalicc@pm.me>"]
 edition = "2018"
+license = "MIT"
+repository = "https://github.com/oxalica/cargo-gc-target"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -13,5 +16,6 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1.0.31"
 bytesize = "1.0.0"
+# Patched from 0.44.1
 cargo = { git = "https://github.com/oxalica/cargo.git", rev = "9e4f7dc320ebf825c79aa14d13bcea2f1c226757" }
 structopt = "0.3.14"
