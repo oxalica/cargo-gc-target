@@ -18,10 +18,10 @@ cargo install --git https://github.com/oxalica/cargo-gc-target.git --tag v0.1.0
 
 ## Usage
 
-In your project/workspace directory, simple run:
+In your project/workspace directory, simple run: (It's `gc` instead of `gc-target`)
 
 ```shell
-cargo gc-target
+cargo gc
 ```
 
 It can also follow custom `target-dir` specified in `.cargo/config` or
