@@ -2,15 +2,75 @@ use anyhow::Result;
 use cargo::{
     core::Workspace, util::important_paths::find_root_manifest_for_wd, CargoResult, Config,
 };
-use std::{env, ffi::OsStr, fs, path::Path};
+use std::{
+    env,
+    ffi::OsStr,
+    fs,
+    path::{Path, PathBuf},
+};
+use structopt::{clap::AppSettings, StructOpt};
 
 mod collect;
 
-fn main() -> Result<()> {
-    let mut config = Config::default()?;
-    config.configure(1, false, None, true, true, false, &None, &[], &[])?;
+#[derive(StructOpt)]
+#[structopt(bin_name = "cargo")]
+enum CliOpts {
+    #[structopt(
+        name = "gc-target",
+        setting = AppSettings::UnifiedHelpMessage,
+    )]
+    GcTarget(CliArgs),
+}
 
-    let root_manifest_path = find_root_manifest_for_wd(&env::current_dir()?)?;
+#[derive(StructOpt)]
+struct CliArgs {
+    /// Path to Cargo.toml
+    #[structopt(long = "manifest-path", value_name = "PATH", parse(from_os_str))]
+    manifest_path: Option<PathBuf>,
+    /// Path to target directory to clean
+    #[structopt(long = "target-dir", value_name = "DIR", parse(from_os_str))]
+    target_dir: Option<PathBuf>,
+
+    /// Increase verbosity
+    #[structopt(long = "verbose", short = "v", parse(from_occurrences))]
+    verbose: u32,
+    /// Do not output anything
+    #[structopt(long = "quiet", short = "q")]
+    quiet: bool,
+    /// Output coloring
+    #[structopt(long = "color", value_name = "WHEN")]
+    color: Option<String>,
+    /// Require Cargo.lock and cache are up to date
+    #[structopt(long = "frozen")]
+    frozen: bool,
+    /// Require Cargo.lock is up to date
+    #[structopt(long = "locked")]
+    locked: bool,
+    /// Do not access the network
+    #[structopt(long = "offline")]
+    offline: bool,
+}
+
+fn main() -> Result<()> {
+    let CliOpts::GcTarget(args) = CliOpts::from_args();
+
+    let mut config = Config::default()?;
+    config.configure(
+        args.verbose,
+        args.quiet,
+        args.color.as_deref(),
+        args.frozen,
+        args.locked,
+        args.offline,
+        &args.target_dir,
+        &[],
+        &[],
+    )?;
+
+    let root_manifest_path = match args.manifest_path {
+        Some(p) => p,
+        None => find_root_manifest_for_wd(&env::current_dir()?)?,
+    };
     let ws = Workspace::new(&root_manifest_path, &config)?;
 
     let bytes = gc_workspace(&ws)?;
