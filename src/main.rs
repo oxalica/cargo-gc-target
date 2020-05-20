@@ -15,11 +15,9 @@ mod collect;
 #[derive(StructOpt)]
 #[structopt(bin_name = "cargo")]
 enum CliOpts {
-    #[structopt(
-        name = "gc-target",
-        setting = AppSettings::UnifiedHelpMessage,
-    )]
-    GcTarget(CliArgs),
+    #[structopt(name = "gc", setting = AppSettings::UnifiedHelpMessage)]
+    /// Garbage-collect the cargo target directory.
+    Gc(CliArgs),
 }
 
 #[derive(StructOpt)]
@@ -55,7 +53,7 @@ struct CliArgs {
 }
 
 fn main() -> Result<()> {
-    let CliOpts::GcTarget(args) = CliOpts::from_args();
+    let CliOpts::Gc(args) = CliOpts::from_args();
 
     let mut config = Config::default()?;
     config.configure(
