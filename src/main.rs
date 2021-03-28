@@ -27,14 +27,15 @@ struct CliArgs {
     /// Path to Cargo.toml
     #[structopt(long = "manifest-path", value_name = "PATH", parse(from_os_str))]
     manifest_path: Option<PathBuf>,
-    /// Path to target directory to clean
+    /// Path to target directory to clean.
+    /// This will skip the out-of-workspace check for target directory
     #[structopt(long = "target-dir", value_name = "DIR", parse(from_os_str))]
     target_dir: Option<PathBuf>,
     /// Do not actually remove files or directories.
     #[structopt(long = "dry-run")]
     dry_run: bool,
 
-    /// Force to run a GC without checking cargo version.
+    /// Force GC without checking cargo version or out-of-workspace target directory.
     #[structopt(long = "force", short = "f")]
     force: bool,
 
@@ -80,11 +81,25 @@ fn main() -> Result<()> {
         &[],
     )?;
 
-    let root_manifest_path = match args.manifest_path {
-        Some(p) => p,
+    let root_manifest_path = match &args.manifest_path {
+        Some(p) => p.clone(),
         None => find_root_manifest_for_wd(&env::current_dir()?)?,
     };
     let ws = Workspace::new(&root_manifest_path, &config)?;
+    if !args.force
+        && args.manifest_path.is_none()
+        && !ws.target_dir().into_path_unlocked().starts_with(ws.root())
+    {
+        eprintln!(
+            "\
+Target directory `{}` is outside the workspace `{}`
+cargo-gc is not suitable for target directory shared by difference workspaces.
+Use `-f` to force GC.",
+            ws.target_dir().into_path_unlocked().display(),
+            ws.root().display(),
+        );
+        std::process::exit(1);
+    }
 
     let bytes = gc_workspace(&ws, args.dry_run)?;
     let bytes_human = bytesize::ByteSize(bytes).to_string_as(true);

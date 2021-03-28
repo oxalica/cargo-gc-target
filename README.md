@@ -27,6 +27,10 @@ cargo gc
 It can also follow custom `target-dir` specified in `.cargo/config` or
 environment variable `CARGO_TARGET_DIR`.
 
+When resolved target directory is outside the workspace, an error will be emitted
+since user may accidentally try to clean shared target directory, which is not
+supported. If you really know what you are doing, pass `-f` to force GC anyway.
+
 ## Details
 
 Currently, it cleans:
