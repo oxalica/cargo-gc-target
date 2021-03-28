@@ -10,6 +10,7 @@ use std::{
 };
 use structopt::{clap::AppSettings, StructOpt};
 
+mod cargo_lto;
 mod collect;
 
 #[derive(StructOpt)]
@@ -53,6 +54,7 @@ struct CliArgs {
 }
 
 fn main() -> Result<()> {
+    env_logger::init();
     let CliOpts::Gc(args) = CliOpts::from_args();
 
     let mut config = Config::default()?;
@@ -128,16 +130,22 @@ fn gc_artifects(
     dir: &Path,
     dry_run: bool,
 ) -> CargoResult<u64> {
-    match target {
-        Some(target) => ws
-            .config()
-            .shell()
-            .status("Collecting", format_args!("{}/{}", target, display_profile))?,
-        None => ws.config().shell().status("Collecting", display_profile)?,
-    }
+    let targets = match target {
+        Some(target) => {
+            ws.config()
+                .shell()
+                .status("Collecting", format_args!("{}/{}", target, display_profile))?;
+            std::slice::from_ref(target)
+        }
+        None => {
+            ws.config().shell().status("Collecting", display_profile)?;
+            &[]
+        }
+    };
 
     let mut reachable = collect::Reachable::default();
-    collect::collect_workspace_units(ws.config(), &ws, &target, profile, &mut reachable)?;
+    collect::collect_workspace_units(ws.config(), &ws, &targets, profile, &mut reachable)?;
+    log::trace!("Reachable: {:?}", reachable);
 
     let mut collected_bytes = 0u64;
     let mut remove = |path: &Path| -> Result<()> {
@@ -152,47 +160,34 @@ fn gc_artifects(
         Ok(())
     };
 
-    fn file_stem(p: &OsStr) -> &OsStr {
-        if let Some(s) = p.to_str() {
-            if let Some(idx) = s.rfind('.') {
-                return OsStr::new(&s[..idx]);
+    let subdirs = &[
+        (".fingerprint", &reachable.fingerprints),
+        ("build", &reachable.builds),
+        ("deps", &reachable.deps),
+    ];
+    for &(subdir, set) in subdirs {
+        for entry in fs::read_dir(dir.join(subdir))? {
+            let entry = entry?;
+            if entry
+                .file_name()
+                .to_str()
+                .map_or(true, |name| !set.contains(name))
+            {
+                remove(&entry.path())?;
             }
         }
-        p
     }
 
-    // Collect `.fingerprints`.
-    for entry in fs::read_dir(dir.join(".fingerprint"))? {
-        let path = entry?.path();
-        if !reachable.fingerprints.contains(&path) {
-            remove(&path)?;
-        }
-    }
-
-    // Collect `build`.
-    for entry in fs::read_dir(dir.join("build"))? {
-        let path = entry?.path();
-        if !reachable.builds.contains(&path) {
-            remove(&path)?;
-        }
-    }
-
-    // Collect `deps`.
-    for entry in fs::read_dir(dir.join("deps"))? {
-        let entry = entry?;
-        if !reachable.dep_stems.contains(file_stem(&entry.file_name())) {
-            remove(&entry.path())?;
-        }
-    }
-
-    // Collect binary and test binary outputs.
+    // Collect uplifted binaries.
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let file_name = entry.file_name();
         // Exclude directory and `.cargo-lock`.
         if entry.file_type()?.is_file()
             && file_name != OsStr::new(".cargo-lock")
-            && !reachable.dep_stems.contains(file_stem(&file_name))
+            && file_name
+                .to_str()
+                .map_or(true, |name| !reachable.uplifts.contains(name))
         {
             remove(&entry.path())?;
         }

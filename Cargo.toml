@@ -16,6 +16,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1.0.31"
 bytesize = "1.0.0"
-# Patched from 0.44.1
-cargo = { git = "https://github.com/oxalica/cargo.git", rev = "9e4f7dc320ebf825c79aa14d13bcea2f1c226757" }
+cargo = "0.52.0"
+env_logger = "0.8.3"
+log = "0.4.14"
 structopt = "0.3.14"
