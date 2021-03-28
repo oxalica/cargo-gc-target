@@ -27,41 +27,25 @@ pub fn collect_workspace_units(
     // https://github.com/rust-lang/cargo/blob/0a4ec2917698ee067b257b580698d7ffb8ccbe2f/src/cargo/util/command_prelude.rs#L361
     let spec = Packages::All;
     let jobs = None;
+    let compile_mode = CompileMode::Build; // Already select all targets below.
+    let mut build_config = BuildConfig::new(&config, jobs, targets, compile_mode)?;
+    build_config.requested_profile = profile.into();
 
-    let compile_modes = [
-        CompileMode::Test,
-        CompileMode::Build,
-        CompileMode::Check { test: false },
-        CompileMode::Check { test: true },
-        CompileMode::Bench,
-        // CompileMode::Doc { deps: false },
-        // CompileMode::Doc { deps: true },
-        // CompileMode::Doctest,
-        // CompileMode::RunCustomBuild, // Not supported here.
-    ];
+    let compile_opts = CompileOptions {
+        build_config,
+        features: Vec::new(),
+        all_features: true,
+        no_default_features: false,
+        spec: spec.clone(),
+        filter: CompileFilter::new_all_targets(),
+        target_rustdoc_args: None,
+        target_rustc_args: None,
+        local_rustdoc_args: None,
+        rustdoc_document_private_items: false,
+        honor_rust_version: false,
+    };
 
-    for &compile_mode in &compile_modes {
-        log::debug!("Compile mode: {:?}", compile_mode);
-
-        let mut build_config = BuildConfig::new(&config, jobs, targets, compile_mode)?;
-        build_config.requested_profile = profile.into();
-
-        let compile_opts = CompileOptions {
-            build_config,
-            features: Vec::new(),
-            all_features: true,
-            no_default_features: false,
-            spec: spec.clone(),
-            filter: CompileFilter::new_all_targets(),
-            target_rustdoc_args: None,
-            target_rustc_args: None,
-            local_rustdoc_args: None,
-            rustdoc_document_private_items: false,
-            honor_rust_version: false,
-        };
-
-        collect_units(ws, &compile_opts, out)?;
-    }
+    collect_units(ws, &compile_opts, out)?;
 
     Ok(())
 }
