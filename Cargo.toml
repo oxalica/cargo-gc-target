@@ -1,6 +1,6 @@
 [package]
 name = "cargo-gc-target"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["oxalica <oxalicc@pm.me>"]
 edition = "2018"
 license = "MIT"
