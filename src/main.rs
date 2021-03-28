@@ -1,7 +1,4 @@
 use anyhow::Result;
-use cargo::{
-    core::Workspace, util::important_paths::find_root_manifest_for_wd, CargoResult, Config,
-};
 use std::{
     env,
     ffi::OsStr,
@@ -11,6 +8,8 @@ use std::{
 use structopt::{clap::AppSettings, StructOpt};
 
 mod collect;
+mod metadata;
+mod unit_graph;
 
 #[derive(StructOpt)]
 #[structopt(bin_name = "cargo")]
@@ -52,6 +51,13 @@ struct CliArgs {
     offline: bool,
 }
 
+fn main() -> Result<()> {
+    let CliOpts::Gc(args) = CliOpts::from_args();
+    println!("hello world");
+    Ok(())
+}
+
+/*
 fn main() -> Result<()> {
     let CliOpts::Gc(args) = CliOpts::from_args();
 
@@ -218,3 +224,5 @@ fn remove_recursive(path: &Path, dry_run: bool) -> Result<u64> {
     }
     Ok(ret)
 }
+
+*/
