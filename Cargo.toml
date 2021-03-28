@@ -6,6 +6,7 @@ edition = "2018"
 license = "MIT"
 repository = "https://github.com/oxalica/cargo-gc-target"
 readme = "README.md"
+description = "Cargo sub-command to delete unused files in your cargo `target` directory"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

@@ -2,46 +2,52 @@
 
 A cargo sub-command to delete unused files in your cargo `target` directory.
 
-Warning 1: This project is still under development. **Use it with care!
-It may unexpectly delete reachable files (cause a rebuild) or your other files.**
-If that happens, please create an issue here.
-
-Warning 2: Simply garbage collecting may not work well with global shared `target`
-directory, since it just collect current workspace and will delete artifects from
-other workspaces.
-
 ## Installation
 
 ```shell
-cargo install --git https://github.com/oxalica/cargo-gc-target.git --tag v0.1.0
+cargo install cargo-gc-target
 ```
+
+Your cargo version should be at least `1.51.0`.
 
 ## Usage
 
-In your project/workspace directory, simple run: (It's `gc` instead of `gc-target`)
+In your project/workspace directory, simple run:
 
 ```shell
 cargo gc
 ```
 
-It can also follow custom `target-dir` specified in `.cargo/config` or
-environment variable `CARGO_TARGET_DIR`.
+Note: It's `gc`. Not `gc-target`.
 
-When resolved target directory is outside the workspace, an error will be emitted
-since user may accidentally try to clean shared target directory, which is not
-supported. If you really know what you are doing, pass `-f` to force GC anyway.
+It can automatically follow custom `target-dir` specified in `.cargo/config`
+or environment variable `CARGO_TARGET_DIR`.
 
-## Details
+# Limitations
 
-Currently, it cleans:
-- Artifects of dependencies: usually under `target/<profile>/deps`
-- Build scripts and their outputs: usually under `target/<profile>/build`
-- Output artifects: usually to be executables and libraries under `target/<profile>`
+- It doesn't work well on shared `target` directory, since a simple tracing GC
+  will erase all artifacts untracable from current workspace but may still
+  referenced in some other workspaces.
 
-It does NOT clean (Not implemented yet):
-- Objects produced by incremental compilation: usually under `target/<profile>/incremental`
-- Examples artifects: usually under `target/<profile>/examples`
-- Documentations: usually under `target/doc`
+  When resolved target directory is outside the workspace, an error will be
+  emitted to protect user from accidentally erasing shared target directory.
+  If you really know what you are doing, pass `-f` to force GC anyway.
+
+- Cargo `target` hierarchy and metadata calculation may change between
+  versions. When using `cargo` other than `1.51.0`, it may incorrectly remove
+  tracable artifacts. Use it with care!
+
+## Supported directories to GC
+
+| Path                            | Content                    | GC supported? |
+| ---                             | ---                        | ---           |
+| `target/<profile>/deps`         | Artifacts of dependencies  | ✅           |
+| `target/<profile>/build`        | Build scripts and outputs  | ✅           |
+| `target/<profile>/.fingerprint` | Cargo fingerprints         | ✅           |
+| `target/<profile>/<bin>`        | Final binary or libraries  | ✅           |
+| `target/<profile>/incremental`  | Rustc incremental temps    |               |
+| `target/<profile>/examples`     | Example artifacts          |               |
+| `target/doc`                    | Documentations             |               |
 
 ## License
 
