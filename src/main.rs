@@ -1,7 +1,8 @@
-use anyhow::Result;
+use anyhow::{ensure, Context as _, Result};
 use cargo::{
     core::Workspace, util::important_paths::find_root_manifest_for_wd, CargoResult, Config,
 };
+use semver::Version;
 use std::{
     env,
     ffi::OsStr,
@@ -29,9 +30,13 @@ struct CliArgs {
     /// Path to target directory to clean
     #[structopt(long = "target-dir", value_name = "DIR", parse(from_os_str))]
     target_dir: Option<PathBuf>,
-    #[structopt(long = "dry-run")]
     /// Do not actually remove files or directories.
+    #[structopt(long = "dry-run")]
     dry_run: bool,
+
+    /// Force to run a GC without checking cargo version.
+    #[structopt(long = "force", short = "f")]
+    force: bool,
 
     /// Increase verbosity
     #[structopt(long = "verbose", short = "v", parse(from_occurrences))]
@@ -55,7 +60,12 @@ struct CliArgs {
 
 fn main() -> Result<()> {
     env_logger::init();
+
     let CliOpts::Gc(args) = CliOpts::from_args();
+
+    if !args.force {
+        assert_cargo_version()?;
+    }
 
     let mut config = Config::default()?;
     config.configure(
@@ -89,6 +99,37 @@ fn main() -> Result<()> {
             .status("Finished", format_args!("{} freed", bytes_human))?;
     }
 
+    Ok(())
+}
+
+fn get_cargo_version(cargo_exe: &OsStr) -> Result<Version> {
+    let output = std::process::Command::new(&cargo_exe)
+        .arg("--version")
+        .output()?;
+    ensure!(output.status.success(), "Command failed");
+    let out = String::from_utf8(output.stdout)?;
+    let version = out.split(" ").nth(1).context("Invalid output")?;
+    Ok(Version::parse(version)?)
+}
+
+fn assert_cargo_version() -> Result<()> {
+    let cargo_exe = std::env::var_os("CARGO").context(
+        "Missing environment `CARGO`. Please run as `cargo gc` instead of the executable itself.",
+    )?;
+    let cargo_ver = get_cargo_version(&cargo_exe)?;
+    let libcargo_ver = {
+        let v = cargo::version();
+        Version::new(v.major.into(), v.minor.into(), v.patch.into())
+    };
+    if cargo_ver < libcargo_ver {
+        eprintln!(
+            "Your cargo ({}) is older than the library used by cargo-gc ({}).
+In-use artifacts may suspiciously be removed due to cargo internal change.
+To do a garbage collection anyway, specify `-f`.",
+            cargo_ver, libcargo_ver,
+        );
+        std::process::exit(1);
+    }
     Ok(())
 }
 
