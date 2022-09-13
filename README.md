@@ -1,5 +1,7 @@
 # cargo-gc-target
 
+**Deprecated in favor of [cargo-sweep](https://github.com/holmgr/cargo-sweep)**
+
 A cargo sub-command to delete unused files in your cargo `target` directory.
 
 ## Installation
